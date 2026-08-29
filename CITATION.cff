@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+
+message: "If you use SECA in your research, please cite it as below."
+
+title: "SECA: Stellar Evolutionary Classification with Asteroseismology"
+
+type: software
+
+authors:
+  - family-names: "Figueira"
+    given-names: "Pedro"
+
+version: "1.0.0"
+
+repository-code: "https://github.com/pedrorfigueira/seca"
+
+license: "MIT"
+
+abstract: >
+  SECA (Stellar Evolutionary Classification with Asteroseismology) is a
+  Python package for classifying stars into broad evolutionary stages from
+  their stellar mass, radius, and effective temperature using standard
+  asteroseismic scaling relations and mass-dependent calibrations based on
+  stellar evolutionary models.
+
+keywords:
+  - stellar evolution
+  - asteroseismology
+  - stellar classification
+  - Gaia
+  - exoplanets

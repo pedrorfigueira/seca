@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seca"
+version = "1.0.0"
+description = "Stellar Evolutionary Classification with Asteroseismology"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+  {name = "Pedro Figueira", email = "pedro.figueira@iaa.es"}
+]
+dependencies = ["numpy>=1.23", "astroquery>=0.4.11"]
+
+keywords = [
+    "astronomy",
+    "asteroseismology",
+    "stellar evolution",
+    "gaia",
+    "classification"
+]
+
+[project.urls]
+Homepage = "https://github.com/pedrofigueira/seca"
+Repository = "https://github.com/pedrofigueira/seca"
+Issues = "https://github.com/pedrofigueira/seca/issues"
+
+[project.scripts]
+seca = "seca.cli:main"
