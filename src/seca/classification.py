@@ -18,6 +18,8 @@ from .calibration import (
     MAX_CALIBRATION_MASS,
 )
 
+from .scaling import seismic_parameter_errors
+
 # ----------------------------------------------------------------------
 # Classification class
 # ----------------------------------------------------------------------
@@ -82,6 +84,12 @@ class StellarClassification:
     model_warnings: tuple = ()
 
     # ----------------------------------------------------------
+    # Mass-offset diagnostic
+    # ----------------------------------------------------------
+
+    mass_offset_warning: bool = False
+
+    # ----------------------------------------------------------
     # Parameter-uncertainty warnings
     # ----------------------------------------------------------
 
@@ -89,6 +97,9 @@ class StellarClassification:
     parameter_warnings: tuple = ()
 
     mass_range_ok: bool = True
+
+    # Calibration used for the nominal classification
+    reference_model: str = "reference"
 
     @property
     def mass_fractional_error(self):
@@ -113,6 +124,7 @@ class StellarClassification:
         text = (
             "SECA Stellar Classification\n"
             "---------------------------\n"
+            f"Reference calibration : {self.reference_model}\n"
             f"Mass                 : {self.mass:.3f} M⊙\n"
             f"Radius               : {self.radius:.3f} R⊙\n"
             f"Teff                 : {self.teff:.0f} K\n"
@@ -227,7 +239,7 @@ class StellarClassification:
                 )
 
             text += (
-                "The reference BaSTI classification is retained.\n"
+                f"The {self.reference_model} reference classification is retained.\n"
             )
 
         else:
@@ -235,7 +247,7 @@ class StellarClassification:
             text += (
                 "\nModel dependence\n"
                 "----------------\n"
-                "No alternative BaSTI model changes the classification.\n"
+                f"No alternative calibration changes the classification relative to {self.reference_model}.\n"
             )
 
         # ----------------------------------------------------------
@@ -267,6 +279,21 @@ class StellarClassification:
                 "\nParameter uncertainty\n"
                 "----------------------\n"
                 "No classification change within 2σ uncertainties.\n"
+            )
+
+        # ----------------------------------------------------------
+        # Mass-offset diagnostic
+        # ----------------------------------------------------------
+
+        if self.mass_offset_warning:
+
+            text += (
+                "\nMass-offset diagnostic\n"
+                "----------------------\n"
+                "WARNING: Δν classifies the star as RGB while "
+                "νmax classifies it as MS.\n"
+                "This combination may indicate a positive offset "
+                "in the input stellar mass.\n"
             )
 
         # ----------------------------------------------------------
@@ -318,6 +345,13 @@ class StellarClassification:
         if not self.is_consistent:
             quality_issues.append(
                 "Δν and νmax classifications are inconsistent"
+            )
+
+        # Mass-offset diagnostic
+        if self.mass_offset_warning:
+            quality_issues.append(
+                "Δν = RGB and νmax = MS; possible positive offset "
+                "in input stellar mass"
             )
 
         # Parameter uncertainty
@@ -380,7 +414,7 @@ def transition_frequency(
     model="reference",
 ):
     """
-    Return a single transition frequency for a specified BaSTI model.
+    Return a single transition frequency for a specified calibration model.
 
     Parameters
     ----------
@@ -394,7 +428,7 @@ def transition_frequency(
         "MS-SG" or "SG-RGB".
 
     model : str
-        BaSTI model name.
+        Calibration model name from BASTI_COEFFICIENTS.
 
     Returns
     -------
@@ -412,74 +446,6 @@ def transition_frequency(
     )
 
 # ----------------------------------------------------------------------
-# Seismic-parameter uncertainties
-# ----------------------------------------------------------------------
-
-def seismic_uncertainties(
-    dnu,
-    numax,
-    mass,
-    radius,
-    teff,
-    emass=None,
-    eradius=None,
-    eteff=None,
-):
-    """
-    Propagate stellar-parameter uncertainties to Δν and νmax.
-
-    Correlations between M, R, and Teff are neglected.
-
-    Returns
-    -------
-    sigma_dnu : float or None
-        Uncertainty on Δν [μHz].
-
-    sigma_numax : float or None
-        Uncertainty on νmax [μHz].
-    """
-
-    if emass is None or eradius is None:
-        return None, None
-
-    if mass <= 0 or radius <= 0 or teff <= 0:
-        raise ValueError(
-            "Mass, radius, and Teff must be positive."
-        )
-
-    if emass < 0 or eradius < 0:
-        raise ValueError(
-            "Mass and radius uncertainties must be non-negative."
-        )
-
-    if eteff is not None and eteff < 0:
-        raise ValueError(
-            "Teff uncertainty must be non-negative."
-        )
-
-    mass_fraction = emass / mass
-    radius_fraction = eradius / radius
-
-    teff_fraction = (
-        eteff / teff
-        if eteff is not None
-        else 0.0
-    )
-
-    sigma_dnu = dnu * np.sqrt(
-        0.25 * mass_fraction**2
-        + 2.25 * radius_fraction**2
-    )
-
-    sigma_numax = numax * np.sqrt(
-        mass_fraction**2
-        + 4.0 * radius_fraction**2
-        + 0.25 * teff_fraction**2
-    )
-
-    return sigma_dnu, sigma_numax
-
-# ----------------------------------------------------------------------
 # Individual classifications
 # ----------------------------------------------------------------------
 
@@ -490,11 +456,11 @@ def classify_parameter_model(
     model="reference",
 ):
     """
-    Classify one seismic parameter using a specified BaSTI model.
+    Classify one seismic parameter using a specified calibration model.
 
-    The reference BaSTI model is used for the authoritative SECA
-    classification; alternative models are evaluated only to assess
-    sensitivity to the adopted stellar-evolution physics.
+    The selected reference model defines the nominal SECA
+    classification; alternative models are evaluated to assess
+    sensitivity to the adopted stellar-evolution calibration.
     """
 
     ms_sg = transition_frequency(
@@ -589,14 +555,15 @@ def classify(
     eradius=None,
     eteff=None,
     flame_flag=None,
+    reference_model="reference",
 ):
     """
     Classify a star from its asteroseismic parameters.
 
     This function classifies the star independently using Δν and νmax
-    and the reference BaSTI evolutionary calibration. Alternative BaSTI
-    model variants and the propagated stellar-parameter uncertainties
-    are also evaluated to identify cases in which the resulting
+    and the selected reference evolutionary calibration. The other
+    available calibrations and the propagated stellar-parameter
+    uncertainties are evaluated to identify cases in which the
     classification is sensitive to the adopted model or input
     uncertainties.
 
@@ -626,6 +593,10 @@ def classify(
     numax : float
         Frequency of maximum oscillation power [μHz].
 
+    reference_model : str, optional
+        Calibration used for the nominal classification. Must be a key
+        in BASTI_COEFFICIENTS. Defaults to "reference".
+
     Returns
     -------
     StellarClassification
@@ -634,21 +605,28 @@ def classify(
     """
 
     # ----------------------------------------------------------
-    # Reference BaSTI classification
+    # Validate and apply the selected reference calibration
     # ----------------------------------------------------------
+
+    if reference_model not in BASTI_COEFFICIENTS:
+        available = ", ".join(BASTI_COEFFICIENTS)
+        raise ValueError(
+            f"Unknown reference_model {reference_model!r}. "
+            f"Choose from: {available}."
+        )
 
     dnu_stage = classify_parameter_model(
         dnu,
         mass,
         "dnu",
-        model="reference",
+        model=reference_model,
     )
 
     numax_stage = classify_parameter_model(
         numax,
         mass,
         "numax",
-        model="reference",
+        model=reference_model,
     )
 
     final_stage = combine_classifications(
@@ -661,19 +639,29 @@ def classify(
     )
 
     # ----------------------------------------------------------
+    # Mass-offset diagnostic
+    # ----------------------------------------------------------
+
+    mass_offset_warning = (
+        dnu_stage == "RGB"
+        and numax_stage == "MS"
+    )
+
+    # ----------------------------------------------------------
     # Propagated seismic uncertainties
     # ----------------------------------------------------------
 
-    sigma_dnu, sigma_numax = seismic_uncertainties(
-        dnu=dnu,
-        numax=numax,
-        mass=mass,
-        radius=radius,
-        teff=teff,
-        emass=emass,
-        eradius=eradius,
-        eteff=eteff,
-    )
+    if emass is not None and eradius is not None:
+        sigma_dnu, sigma_numax = seismic_parameter_errors(
+            mass=mass,
+            radius=radius,
+            teff=teff,
+            emass=emass,
+            eradius=eradius,
+            eteff=eteff,
+        )
+    else:
+        sigma_dnu, sigma_numax = None, None
 
     # ----------------------------------------------------------
     # Parameter-uncertainty classification test
@@ -695,14 +683,14 @@ def classify(
             dnu_minus,
             mass,
             "dnu",
-            model="reference",
+            model=reference_model,
         )
 
         dnu_plus_stage = classify_parameter_model(
             dnu + dnu_2sigma,
             mass,
             "dnu",
-            model="reference",
+            model=reference_model,
         )
 
         dnu_minus_final = combine_classifications(
@@ -747,14 +735,14 @@ def classify(
             numax_minus,
             mass,
             "numax",
-            model="reference",
+            model=reference_model,
         )
 
         numax_plus_stage = classify_parameter_model(
             numax + numax_2sigma,
             mass,
             "numax",
-            model="reference",
+            model=reference_model,
         )
 
         numax_minus_final = combine_classifications(
@@ -785,12 +773,12 @@ def classify(
                 )
             )
 
-    # Classification with different models
+    # Classification with alternative calibrations
 
     alternative_models = [
         model_name
         for model_name in BASTI_COEFFICIENTS
-        if model_name != "reference"
+        if model_name != reference_model
     ]
 
     model_warnings = []
@@ -882,6 +870,12 @@ def classify(
         # Parameter uncertainty
         parameter_warnings=tuple(parameter_warnings),
 
+        # Mass-offset diagnostic
+        mass_offset_warning=mass_offset_warning,
+
         # Mass range
         mass_range_ok=mass_range_ok,
+
+        # Reference calibration
+        reference_model=reference_model,
     )

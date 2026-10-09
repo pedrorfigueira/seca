@@ -11,6 +11,7 @@ import sys
 from . import __version__
 
 from .core import classify_star, classify_catalog
+from .calibration import BASTI_COEFFICIENTS
 
 from .io import (
     read_catalog,
@@ -96,6 +97,21 @@ def build_parser():
     )
 
     # --------------------------------------------------------------
+    # Reference calibration
+    # --------------------------------------------------------------
+
+    parser.add_argument(
+        "--reference-model",
+        choices=tuple(BASTI_COEFFICIENTS),
+        default="reference",
+        metavar="MODEL",
+        help=(
+            "BaSTI calibration used as the reference for classification "
+            "(default: reference)."
+        ),
+    )
+
+    # --------------------------------------------------------------
     # Stellar parameter uncertainties
     # --------------------------------------------------------------
 
@@ -124,7 +140,7 @@ def build_parser():
 # Gaia classification helper
 # ----------------------------------------------------------------------
 
-def classify_gaia_source(source_id):
+def classify_gaia_source(source_id, reference_model="reference"):
     """
     Retrieve Gaia DR3 stellar parameters and classify the star.
     """
@@ -148,6 +164,7 @@ def classify_gaia_source(source_id):
         eteff=stellar_parameters.get("eteff"),
 
         flame_flag=stellar_parameters.get("flame_flag"),
+        reference_model=reference_model,
     )
 
     print_result(result)
@@ -213,7 +230,7 @@ def main():
 
             gaia_source_id = get_gaia_source_id(args.simbad)
             print(f"SIMBAD identifier : {args.simbad}")
-            classify_gaia_source(gaia_source_id)
+            classify_gaia_source(gaia_source_id, args.reference_model)
 
             return
 
@@ -223,7 +240,7 @@ def main():
 
         if args.gaia is not None:
 
-            classify_gaia_source(args.gaia)
+            classify_gaia_source(args.gaia, args.reference_model)
 
             return
 
@@ -239,7 +256,7 @@ def main():
 
             if catalog_type == "stellar":
 
-                results = classify_catalog(**catalog)
+                results = classify_catalog(**catalog, reference_model=args.reference_model)
 
                 write_catalog(args.file, results)
                 print_summary(results)
@@ -271,7 +288,7 @@ def main():
 
                         try:
 
-                            result = classify_gaia_source(int(identifier))
+                            result = classify_gaia_source(int(identifier), args.reference_model)
                             results.append(result)
                             successful_identifiers.append(identifier)
 
@@ -297,7 +314,7 @@ def main():
 
                             gaia_source_id = get_gaia_source_id(identifier)
 
-                            result = classify_gaia_source(gaia_source_id)
+                            result = classify_gaia_source(gaia_source_id, args.reference_model)
                             results.append(result)
                             successful_identifiers.append(identifier)
                             source_ids.append(gaia_source_id)
@@ -363,6 +380,7 @@ def main():
             emass=args.emass,
             eradius=args.eradius,
             eteff=args.eteff,
+            reference_model=args.reference_model,
 
         )
 

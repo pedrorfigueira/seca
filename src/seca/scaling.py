@@ -7,7 +7,13 @@ Pedro Figueira
 import numpy as np
 
 from .calibration import (
-    DNU_SUN, NUMAX_SUN, TEFF_SUN)
+    DNU_SUN,
+    DNU_SUN_ERR,
+    NUMAX_SUN,
+    NUMAX_SUN_ERR,
+    TEFF_SUN,
+)
+
 
 # ----------------------------------------------------------------------
 # Scaling relations
@@ -55,8 +61,12 @@ def numax(mass, radius, teff):
         νmax [μHz]
     """
 
-    return NUMAX_SUN * mass / radius**2 / np.sqrt(teff / TEFF_SUN)
-
+    return (
+        NUMAX_SUN
+        * mass
+        / radius**2
+        / np.sqrt(teff / TEFF_SUN)
+    )
 
 
 def seismic_parameters(mass, radius, teff):
@@ -76,7 +86,7 @@ def seismic_parameters(mass, radius, teff):
 
 
 # ----------------------------------------------------------------------
-# Error propagation - not used in current version
+# Error propagation
 # ----------------------------------------------------------------------
 
 def delta_nu_error(
@@ -87,6 +97,9 @@ def delta_nu_error(
 ):
     """
     Propagate uncertainties to Δν.
+
+    The uncertainty in the solar reference value is included
+    in the error budget.
 
     Parameters
     ----------
@@ -105,6 +118,8 @@ def delta_nu_error(
     dnu = delta_nu(mass, radius)
 
     frac = np.sqrt(
+        (DNU_SUN_ERR / DNU_SUN) ** 2
+        +
         0.25 * (emass / mass) ** 2
         +
         2.25 * (eradius / radius) ** 2
@@ -124,6 +139,9 @@ def numax_error(
     """
     Propagate uncertainties to νmax.
 
+    The uncertainty in the solar reference value is included
+    in the error budget.
+
     Parameters
     ----------
     emass : float
@@ -132,8 +150,9 @@ def numax_error(
     eradius : float
         Radius uncertainty [Rsun]
 
-    eteff : float
-        Effective-temperature uncertainty [K]
+    eteff : float or None
+        Effective-temperature uncertainty [K]. If None, its
+        contribution to the uncertainty budget is neglected.
 
     Returns
     -------
@@ -143,18 +162,26 @@ def numax_error(
 
     nm = numax(mass, radius, teff)
 
+    teff_fraction = (
+        eteff / teff
+        if eteff is not None
+        else 0.0
+    )
+
     frac = np.sqrt(
+        (NUMAX_SUN_ERR / NUMAX_SUN) ** 2
+        +
         (emass / mass) ** 2
         +
         4.0 * (eradius / radius) ** 2
         +
-        0.25 * (eteff / teff) ** 2
+        0.25 * teff_fraction**2
     )
 
     return nm * frac
 
 
-def propagate_errors(
+def seismic_parameter_errors(
     mass,
     radius,
     teff,
@@ -173,14 +200,12 @@ def propagate_errors(
     """
 
     return (
-
         delta_nu_error(
             mass,
             radius,
             emass,
             eradius,
         ),
-
         numax_error(
             mass,
             radius,
@@ -189,36 +214,4 @@ def propagate_errors(
             eradius,
             eteff,
         ),
-    )
-
-def meets_precision_requirement(
-    mass,
-    radius,
-    teff,
-    emass,
-    eradius,
-    eteff,
-):
-    """
-    Check whether the propagated uncertainties satisfy
-    the SECA calibration precision.
-
-    Returns
-    -------
-    bool
-    """
-
-    sdnu, snumax = propagate_errors(
-        mass,
-        radius,
-        teff,
-        emass,
-        eradius,
-        eteff,
-    )
-
-    return (
-        sdnu <= CALIBRATION_DNU_ERROR
-        and
-        snumax <= CALIBRATION_NUMAX_ERROR
     )

@@ -22,16 +22,14 @@ def classify_star(
     eradius=None,
     eteff=None,
     flame_flag=None,
+    reference_model="reference",
 ):
     """
     Classify a star from its fundamental stellar parameters.
 
     The stellar mass, radius and effective temperature are converted
     into the seismic quantities Δν and νmax using the standard scaling
-    relations.
-    If mass and radius uncertainties are provided, SECA evaluates
-    their fractional uncertainties against the recommended 6% limits.
-    The resulting seismic quantities are then classified
+    relations. The resulting seismic quantities are then classified
     using the mass-dependent evolutionary transition zones.
 
     Parameters
@@ -54,6 +52,13 @@ def classify_star(
     eteff : float, optional
         Uncertainty on the effective temperature [K].
 
+    flame_flag : str, optional
+        Gaia FLAME quality flag, when available.
+
+    reference_model : str, optional
+        BaSTI calibration used as the reference for classification.
+        Defaults to "reference".
+
     Returns
     -------
     StellarClassification
@@ -66,15 +71,13 @@ def classify_star(
         mass=mass,
         radius=radius,
         teff=teff,
-
         dnu=dnu,
         numax=numax,
-
         emass=emass,
         eradius=eradius,
         eteff=eteff,
-
         flame_flag=flame_flag,
+        reference_model=reference_model,
     )
 
 
@@ -89,6 +92,7 @@ def classify_catalog(
     emass=None,
     eradius=None,
     eteff=None,
+    reference_model="reference",
 ):
     """
     Classify a catalogue of stars.
@@ -105,10 +109,15 @@ def classify_catalog(
         Effective temperatures [K].
 
     emass, eradius : array-like, optional
-        Uncertainties on the stellar mass and radius.
+        Uncertainties on the stellar mass and radius. They must be
+        provided together.
 
     eteff : array-like, optional
         Uncertainty on the effective temperature.
+
+    reference_model : str, optional
+        BaSTI calibration used as the reference for classification.
+        Defaults to "reference".
 
     Returns
     -------
@@ -131,10 +140,7 @@ def classify_catalog(
     # Determine whether uncertainties are being used
     # ----------------------------------------------------------
 
-    use_errors = (
-        emass is not None
-        and eradius is not None
-    )
+    use_errors = emass is not None and eradius is not None
 
     # Mass and radius uncertainties must be supplied together.
     if (emass is None) != (eradius is None):
@@ -145,15 +151,18 @@ def classify_catalog(
         eteff = list(eteff)
 
         if len(eteff) != nstars:
-            raise ValueError("eteff must have the same length as the stellar parameters.")
+            raise ValueError(
+                "eteff must have the same length as the stellar parameters."
+            )
 
     if use_errors:
-
         emass = list(emass)
         eradius = list(eradius)
 
-        if not ( len(emass) == len(eradius) == nstars ):
-            raise ValueError("emass and eradius must have the same length as the stellar parameters.")
+        if not (len(emass) == len(eradius) == nstars):
+            raise ValueError(
+                "emass and eradius must have the same length as the stellar parameters."
+            )
 
     # ----------------------------------------------------------
     # Classify stars
@@ -162,37 +171,15 @@ def classify_catalog(
     results = []
 
     for i in range(nstars):
-
-        if use_errors:
-
-            result = classify_star(
-                mass=mass[i],
-                radius=radius[i],
-                teff=teff[i],
-
-                emass=emass[i],
-                eradius=eradius[i],
-
-                eteff=(
-                    eteff[i]
-                    if eteff is not None
-                    else None
-                ),
-            )
-
-        else:
-
-            result = classify_star(
-                mass=mass[i],
-                radius=radius[i],
-                teff=teff[i],
-
-                eteff=(
-                    eteff[i]
-                    if eteff is not None
-                    else None
-                ),
-            )
+        result = classify_star(
+            mass=mass[i],
+            radius=radius[i],
+            teff=teff[i],
+            emass=emass[i] if use_errors else None,
+            eradius=eradius[i] if use_errors else None,
+            eteff=eteff[i] if eteff is not None else None,
+            reference_model=reference_model,
+        )
 
         results.append(result)
 

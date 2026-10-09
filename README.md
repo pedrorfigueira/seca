@@ -38,12 +38,6 @@ and install:
 pip install .
 ```
 
-For development:
-
-```bash
-pip install -e .
-```
-
 ---
 
 # Python usage
@@ -59,12 +53,13 @@ result = seca.classify_star(
     mass=1.35,
     radius=2.70,
     teff=5600,
+    reference_model="reference",  # optional; default is "reference"
 )
 
 print(result)
 ```
 
-If mass and radius uncertainties are available, SECA propagates them to the seismic quantities $\Delta\nu$ and $\nu_{\rm max}$. An effective-temperature uncertainty can also be supplied and is included in the $\nu_{\rm max}$ uncertainty propagation.
+If parameter uncertainties are available, SECA propagates them to the seismic quantities $\Delta\nu$ and $\nu_{\rm max}$.
 
 ```python
 result = seca.classify_star(
@@ -106,6 +101,18 @@ seca \
 ```
 
 The output includes the stellar parameters, seismic quantities, evolutionary classification and, when applicable, the quality assessment.
+
+By default, SECA uses the `reference` BaSTI calibration. An alternative calibration can be selected with `--reference-model`:
+
+```bash
+seca \\
+    -m 1.35 \\
+    -r 2.70 \\
+    -t 5600 \\
+    --reference-model no_diffusion
+```
+
+The available choices are the model names defined in `BASTI_COEFFICIENTS` in `calibration.py` (for example, `reference`, `no_diffusion`, and `no_overshooting`). The selected calibration is used as the reference for the classification; other calibrations are assessed for model dependence.
 
 Uncertainties can be provided with:
 
@@ -223,7 +230,7 @@ Detected columns:
 Parameter uncertainties: provided
 ```
 
-The resulting catalogue is written automatically with `_seca` appended to the input filename. 
+The resulting catalogue is written automatically with `_seca` appended to the input filename.
 
 It contains the input stellar parameters, the derived seismic quantities and their propagated uncertainties, the individual and final classifications, the consistency indicator, model-dependence warnings, parameter-uncertainty warnings, the calibration-range status and, for Gaia-derived inputs, the FLAME quality information.
 
@@ -321,11 +328,9 @@ Possible cross-effects between stellar-parameter uncertainties and changes in ev
 
 # Model dependence
 
-SECA uses a reference BaSTI evolutionary calibration for the authoritative classification.
+SECA uses a reference BaSTI evolutionary calibration for the authoritative classification. The default is `reference`, but this can be changed with the `reference_model` argument in Python or the `--reference-model` command-line option.
 
-Alternative BaSTI model variants are evaluated independently. If an alternative model produces a different final classification, SECA reports the model and the alternative classification through `model_warnings`.
-
-The reference BaSTI classification is always retained.
+Alternative BaSTI model variants are evaluated independently. If an alternative model produces a different final classification, SECA reports the model and the alternative classification through `model_warnings`. The selected reference calibration is retained.
 
 ---
 
@@ -339,18 +344,19 @@ The FLAME flag is reported together with the classification. It does not alter t
 
 # Command-line summary
 
-| Option            | Description                                      |
-| ----------------- | ------------------------------------------------ |
-| `-m MASS`         | Stellar mass [$M_\odot$]                         |
-| `-r RADIUS`       | Stellar radius [$R_\odot$]                       |
-| `-t TEFF`         | Effective temperature [K]                        |
-| `-f FILE`         | Stellar-parameter or identifier catalogue        |
-| `-g SOURCE_ID`    | Gaia DR3 source identifier                       |
-| `-s IDENTIFIER`   | SIMBAD identifier                                |
-| `--emass VALUE`   | Mass uncertainty [$M_\odot$]                     |
-| `--eradius VALUE` | Radius uncertainty [$R_\odot$]                   |
-| `--eteff VALUE`   | Effective-temperature uncertainty [K]            |
-| `--version`       | Display SECA version                             |
+| Option                     | Description                                      |
+| -------------------------- | ------------------------------------------------ |
+| `-m MASS`                  | Stellar mass [$M_\odot$]                         |
+| `-r RADIUS`                | Stellar radius [$R_\odot$]                       |
+| `-t TEFF`                  | Effective temperature [K]                        |
+| `-f FILE`                  | Stellar-parameter or identifier catalogue        |
+| `-g SOURCE_ID`             | Gaia DR3 source identifier                       |
+| `-s IDENTIFIER`            | SIMBAD identifier                                |
+| `--emass VALUE`            | Mass uncertainty [$M_\odot$]                     |
+| `--eradius VALUE`          | Radius uncertainty [$R_\odot$]                   |
+| `--eteff VALUE`            | Effective-temperature uncertainty [K]            |
+| `--reference-model MODEL`  | BaSTI calibration used as the reference          |
+| `--version`                | Display SECA version                             |
 
 The input modes `-f`, `-g` and `-s` are mutually exclusive. Individual stellar parameters cannot be combined with these input modes.
 

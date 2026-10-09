@@ -39,9 +39,11 @@ def _classification_header(prefix):
         "SigmaDeltaNu SigmaNumax "
         "DeltaNuStage NumaxStage Stage "
         "Consistent "
+        "ReferenceModel "
         "ModelWarnings "
         "ParameterWarnings "
         "MassRangeOK "
+        "MassOffsetWarning "
         "FLAMEFlag FLAMEQualityOK\n"
 
         "# Units:\n"
@@ -56,10 +58,13 @@ def _classification_header(prefix):
         "# DeltaNuStage, NumaxStage : MS, SG, RGB\n"
         "# Stage : MS, MS-SG, SG, SG-RGB, RGB, NA\n"
 
-        "# ModelWarnings : alternative BaSTI models giving a different classification\n"
-        "# ParameterWarnings : propagated 2sigma seismic-parameter perturbations giving a different classification\n"
+        "# ReferenceModel : calibration used as the reference for classification\n"
+        "# ModelWarnings : alternative calibrations giving a different classification\n"
+        "# ParameterWarnings : classification changes under propagated 2sigma seismic-parameter uncertainties\n"
 
         "# MassRangeOK : 1=within calibrated mass range, 0=outside\n"
+        "# MassOffsetWarning : 1=Δν is RGB and νmax is MS, 0=no\n"
+
         "# FLAMEFlag : Gaia DR3 FLAME quality flag\n"
         "# FLAMEQualityOK : 1=yes, 0=no, NA=not applicable\n"
         "#\n"
@@ -233,7 +238,7 @@ def read_catalog(filename):
         })
 
     return catalog, "stellar"
-    
+
 # ----------------------------------------------------------------------
 # Read identifier file
 # ----------------------------------------------------------------------
@@ -379,11 +384,13 @@ def write_catalog(filename, results):
                 f"{r.numax_stage} "
                 f"{r.stage if r.stage is not None else 'NA'} "
                 f"{int(r.is_consistent)} "
+                f"{getattr(r, 'reference_model', 'reference')} "
 
                 f"{_format_model_warnings(r.model_warnings)} "
                 f"{_format_parameter_warnings(r.parameter_warnings)} "
 
                 f"{int(r.mass_range_ok)} "
+                f"{int(r.mass_offset_warning)} "
                 f"{r.flame_flag if r.flame_flag is not None else 'NA'} "
                 f"{'NA' if r.flame_quality_ok is None else int(r.flame_quality_ok)}\n"
             )
@@ -497,11 +504,13 @@ def write_identifier_catalog(
                 + f"{r.numax_stage} "
                 + f"{r.stage if r.stage is not None else 'NA'} "
                 + f"{int(r.is_consistent)} "
+                + f"{getattr(r, 'reference_model', 'reference')} "
 
                 + f"{_format_model_warnings(r.model_warnings)} "
                 + f"{_format_parameter_warnings(r.parameter_warnings)} "
 
                 + f"{int(r.mass_range_ok)} "
+                + f"{int(r.mass_offset_warning)} "
                 + f"{r.flame_flag if r.flame_flag is not None else 'NA'} "
                 + f"{'NA' if r.flame_quality_ok is None else int(r.flame_quality_ok)}\n"
             )
@@ -557,6 +566,9 @@ def _summary_text(results):
     nstars = len(results)
 
     lines.append(f"Total stars : {nstars}")
+    reference_models = sorted({getattr(r, "reference_model", "reference") for r in results})
+    if reference_models:
+        lines.append("Reference calibration(s) : " + ", ".join(reference_models))
     lines.append("")
 
     # ----------------------------------------------------------
@@ -590,6 +602,38 @@ def _summary_text(results):
     lines.append(
         f"Inconsistent classifications : "
         f"{ninconsistent}/{nstars}"
+    )
+
+    # ----------------------------------------------------------
+    # Mass-offset diagnostic
+    # ----------------------------------------------------------
+
+    n_mass_offset = sum(
+        r.mass_offset_warning
+        for r in results
+    )
+
+    lines.append("")
+
+    lines.append(
+        f"Mass-offset warnings          : "
+        f"{n_mass_offset}/{nstars}"
+    )
+
+    # ----------------------------------------------------------
+    # Gaia FLAME quality
+    # ----------------------------------------------------------
+
+    n_flame_warning = sum(
+        r.flame_quality_ok is False
+        for r in results
+    )
+
+    lines.append("")
+
+    lines.append(
+        f"FLAME quality flags       : "
+        f"{n_flame_warning}/{nstars}"
     )
 
     # ----------------------------------------------------------

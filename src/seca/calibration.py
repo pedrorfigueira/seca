@@ -25,10 +25,23 @@ The ordered evolutionary sequence used by SECA is:
 
 # ----------------------------------------------------------------------
 # Solar reference values
+#
+# Huber et al. (2011):
+#     Δν_sun   = 135.1 ± 0.1 μHz
+#     νmax_sun = 3090  ± 30  μHz
+#
+# The νmax uncertainty is retained as a fixed 30 μHz reference
+# uncertainty. This represents the uncertainty adopted for the
+# solar calibration and is propagated into the predicted stellar
+# νmax uncertainties.
 # ----------------------------------------------------------------------
 
 DNU_SUN = 135.1          # μHz
+DNU_SUN_ERR = 0.1        # μHz
+
 NUMAX_SUN = 3090.0       # μHz
+NUMAX_SUN_ERR = 30.0     # μHz
+
 TEFF_SUN = 5772.0        # K
 
 # ----------------------------------------------------------------------
